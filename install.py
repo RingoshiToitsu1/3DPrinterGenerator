@@ -57,28 +57,47 @@ def install_torch():
 
 def install_vendored(repo: str, commit: str, folder: str):
     target = HERE / "vendor" / folder
-    if (target / ".pinned").is_file() and (target / ".pinned").read_text().strip() == commit:
+    pinned = target / ".pinned"
+    if pinned.is_file() and pinned.read_text().strip() == commit:
+        print(f"\n== {folder} code already present ==")
+        return
+    if not pinned.is_file() and target.is_dir() and any(target.iterdir()):
+        # Downloaded by an older version of this installer (same pinned commit): keep it.
+        pinned.write_text(commit)
         print(f"\n== {folder} code already present ==")
         return
     shutil.rmtree(target, ignore_errors=True)
     print(f"\n== Downloading {folder} code ==")
     target.parent.mkdir(exist_ok=True)
+
+    # The zip has no git history, so it's the smallest download. Fall back to git.
+    try:
+        with urllib.request.urlopen(f"https://github.com/{repo}/archive/{commit}.zip") as r:
+            data = r.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            root = z.namelist()[0].split("/")[0]
+            z.extractall(HERE / "vendor")
+        (HERE / "vendor" / root).rename(target)
+        pinned.write_text(commit)
+        return
+    except Exception as e:
+        shutil.rmtree(target, ignore_errors=True)
+        print(f"   (zip download failed: {e}; trying git)")
+
     if shutil.which("git"):
         url = f"https://github.com/{repo}.git"
-        if subprocess.call(["git", "clone", "-q", url, str(target)]) == 0 and subprocess.call(
-            ["git", "-C", str(target), "checkout", "-q", commit]
-        ) == 0:
-            (target / ".pinned").write_text(commit)
+        target.mkdir(parents=True)
+        steps = (
+            ["git", "init", "-q"],
+            ["git", "fetch", "-q", "--depth", "1", url, commit],
+            ["git", "checkout", "-q", "FETCH_HEAD"],
+        )
+        if all(subprocess.call(cmd, cwd=target) == 0 for cmd in steps):
+            shutil.rmtree(target / ".git", ignore_errors=True)
+            pinned.write_text(commit)
             return
         shutil.rmtree(target, ignore_errors=True)
-        print("   (git download failed, trying zip)")
-    with urllib.request.urlopen(f"https://github.com/{repo}/archive/{commit}.zip") as r:
-        data = r.read()
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
-        root = z.namelist()[0].split("/")[0]
-        z.extractall(HERE / "vendor")
-    (HERE / "vendor" / root).rename(target)
-    (target / ".pinned").write_text(commit)
+    raise RuntimeError(f"Couldn't download the {folder} code. Check your internet connection and try again.")
 
 
 def main():

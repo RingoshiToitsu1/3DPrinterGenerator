@@ -15,6 +15,7 @@ Only the engine in use is kept on the GPU; the other waits on the CPU.
 from __future__ import annotations
 
 import gc
+import os
 import sys
 import types
 from pathlib import Path
@@ -28,6 +29,7 @@ from skimage.measure import marching_cubes
 HERE = Path(__file__).resolve().parent
 TRIPOSR_DIR = HERE / "vendor" / "TripoSR"
 HUNYUAN_DIR = HERE / "vendor" / "Hunyuan3D-2"
+MODELS_DIR = HERE / "models"  # Hunyuan weights live here (one file, ~5 GB)
 
 # Detail level -> engine setting
 HUNYUAN_OCTREE = {"Normal": 256, "High": 384, "Max": 512}
@@ -38,6 +40,20 @@ def pick_device(requested: str | None = None) -> str:
     if requested:
         return requested
     return "cuda:0" if torch.cuda.is_available() else "cpu"
+
+
+def _ensure_code(folder: Path, marker: str):
+    """Download a model's code if setup didn't (or the folder was replaced)."""
+    if (folder / marker).is_dir():
+        return
+    import install
+
+    for repo, commit, name in install.VENDORED:
+        if name == folder.name:
+            print(f"{name} code missing, downloading it now...")
+            install.install_vendored(repo, commit, name)
+    if not (folder / marker).is_dir():
+        raise RuntimeError(f"Couldn't download the {folder.name} code. Check the internet connection and run setup.bat again.")
 
 
 def _free_gpu():
@@ -71,8 +87,7 @@ def on_gray(rgba: Image.Image) -> Image.Image:
 
 # --------------------------------------------------------------------- TripoSR
 def _import_triposr():
-    if not (TRIPOSR_DIR / "tsr").is_dir():
-        raise RuntimeError(f"TripoSR code not found in {TRIPOSR_DIR}. Run the setup script first.")
+    _ensure_code(TRIPOSR_DIR, "tsr")
     if str(TRIPOSR_DIR) not in sys.path:
         sys.path.insert(0, str(TRIPOSR_DIR))
     # tsr imports torchmcubes at import time; we never call it, so stub it out.
@@ -134,8 +149,7 @@ class TripoSREngine:
 
 # ------------------------------------------------------------------- Hunyuan3D
 def _import_hunyuan():
-    if not (HUNYUAN_DIR / "hy3dgen").is_dir():
-        raise RuntimeError(f"Hunyuan3D-2 code not found in {HUNYUAN_DIR}. Run the setup script again.")
+    _ensure_code(HUNYUAN_DIR, "hy3dgen")
     if str(HUNYUAN_DIR) not in sys.path:
         sys.path.insert(0, str(HUNYUAN_DIR))
     from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline
@@ -152,11 +166,30 @@ class HunyuanEngine:
     def __init__(self, device: str):
         Pipeline = _import_hunyuan()
         dtype = torch.float16 if device.startswith("cuda") else torch.float32
-        # Weights (~5 GB) download from Hugging Face on first use and are cached.
+        self._download_weights()
         self.pipe = Pipeline.from_pretrained(
             self.REPO, subfolder=self.SUBFOLDER, use_safetensors=True, device=device, dtype=dtype
         )
         self.device = device
+
+    @classmethod
+    def _download_weights(cls):
+        """Fetch only the one weights file we use (~5 GB).
+
+        Hunyuan's own loader downloads every file in the folder, and Tencent ships
+        the same model in five formats (~25 GB). We place the one we need where
+        Hunyuan looks first (HY3DGEN_MODELS/<repo>/<subfolder>), so it never
+        downloads the rest.
+        """
+        from huggingface_hub import hf_hub_download
+
+        target = MODELS_DIR / cls.REPO
+        for name in ("config.yaml", "model.fp16.safetensors"):
+            if not (target / cls.SUBFOLDER / name).is_file():
+                if name.endswith(".safetensors"):
+                    print("Downloading the Best-quality model (~5 GB, one time)...")
+                hf_hub_download(cls.REPO, f"{cls.SUBFOLDER}/{name}", local_dir=target)
+        os.environ["HY3DGEN_MODELS"] = str(MODELS_DIR)
 
     def to(self, device: str):
         self.pipe.to(device)

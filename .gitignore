@@ -4,3 +4,4 @@ output/
 __pycache__/
 phone-password.txt
 github-token.txt
+models/
