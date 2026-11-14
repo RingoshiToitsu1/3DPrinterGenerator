@@ -27,7 +27,19 @@ Mac/Linux: run `./setup.sh` instead.
 2. Drop in a photo, set the **print height in mm**, then click **Make 3D model**.
 3. Check the 3D preview, then download the **3MF** and open it in Bambu Studio. Your files are also saved in the `output` folder.
 
-To use it from your phone or another computer on the same Wi‑Fi, start it with `start.bat --share-on-network`, then open `http://<your-PC's-IP>:7860`.
+## Use it from your phone, anywhere
+
+This uses **Tailscale**, a free private network between your own devices. The app is never on the public internet; only your devices can reach it.
+
+1. Install Tailscale on the laptop (<https://tailscale.com/download>) and on your phone (App Store / Play Store). Sign in on both with the same account.
+2. On the laptop, double-click **`start-phone.bat`**. The first time, it asks you to pick a password. It's saved in `phone-password.txt`, which never gets uploaded to GitHub.
+3. On your phone, with Tailscale switched on, open the address it prints, like `http://LAPTOP-NAME:7860`. If that doesn't load, use the laptop's name or `100.x.x.x` address from the Tailscale app instead.
+4. Log in with any username and your password.
+5. Make it feel like an app: in Safari tap **Share → Add to Home Screen**, or in Chrome tap **⋮ → Add to Home screen**.
+
+From the phone, tap the photo box to take a picture or pick one from your library. Then download the 3MF and open it in Bambu Handy or send it to your computer.
+
+The laptop has to be on, awake, plugged in and running `start-phone.bat`. If Windows Firewall asks, click **Allow**. To keep it from sleeping, go to Settings → System → Power and set **Sleep when plugged in** to **Never**.
 
 Doing a batch of photos? Use the command line:
 
@@ -68,3 +80,4 @@ Doing a batch of photos? Use the command line:
 - `pipeline.py`: photo → 3D, using TripoSR. Runs marching cubes itself, so the hard-to-install `torchmcubes` isn't needed.
 - `printprep.py`: makes the mesh printable and exports STL/3MF
 - `install.py`, `setup.bat`/`setup.sh`, `start.bat`/`start.sh`: setup and launch scripts
+- `start-phone.bat`: launch for phone use (network + password)

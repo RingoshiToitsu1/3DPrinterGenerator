@@ -1,6 +1,7 @@
 """Photo -> 3D print web app. Run `python app.py`, then open http://127.0.0.1:7860"""
 
 import argparse
+import os
 import re
 import time
 from pathlib import Path
@@ -94,9 +95,23 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default=None, help="cuda:0 or cpu (default: auto)")
     ap.add_argument("--port", type=int, default=7860)
-    ap.add_argument("--share-on-network", action="store_true", help="let other devices on your Wi-Fi open it")
+    ap.add_argument(
+        "--share-on-network", action="store_true", help="let your other devices (Wi-Fi or Tailscale) open it"
+    )
+    ap.add_argument(
+        "--password",
+        default=os.environ.get("PHOTO3D_PASSWORD"),
+        help="require this password (any username) to open the app; or set PHOTO3D_PASSWORD",
+    )
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
+
+    auth = None
+    if args.password:
+        password = args.password
+        auth = lambda _user, pw: pw == password  # noqa: E731
+    elif args.share_on_network:
+        print("Tip: add --password <something> so nobody else on the same network can use it.")
 
     print("Loading TripoSR (first run downloads ~1.7 GB)...")
     engine = PhotoTo3D(device=args.device)
@@ -108,4 +123,7 @@ if __name__ == "__main__":
         server_port=args.port,
         inbrowser=not args.no_browser,
         allowed_paths=[str(OUTPUT_DIR)],
+        auth=auth,
+        auth_message="Photo to 3D Print. Any username, your password.",
+        pwa=True,  # lets the phone "Add to Home Screen" like an app
     )
