@@ -2,10 +2,11 @@
 
 Upload a photo, get a 3MF/STL file ready for Bambu Studio. It runs on your own computer, free, with no per-model fees.
 
-It has two AI models:
+It has three quality choices:
 
-- **Best: Hunyuan3D-2** (Tencent). Sharp, detailed shapes. About 1–3 minutes per model on an NVIDIA card.
-- **Fast: TripoSR** (Tripo AI). Seconds per model, but rough and blobby. Good for quick tests.
+- **Tripo (cloud):** sends the photo to Tripo, the same engine as studio.tripo3d.ai. Most detail plus full color texture. Uses Tripo credits (paid), so it needs a Tripo API key (see below).
+- **Best: Hunyuan3D-2** (Tencent, runs on your graphics card, free). Sharp, detailed shapes. About 1–3 minutes per model.
+- **Fast: TripoSR** (runs on your graphics card, free). Seconds per model, but rough and blobby. Good for quick tests.
 
 The app then cleans the model up for printing: it keeps one solid piece, gives it a flat base, scales it to the height you pick in mm and sets it on the build plate.
 
@@ -39,6 +40,20 @@ Mac/Linux: run `./setup.sh` instead.
 2. Drop in a photo, set the **print height in mm**, then click **Make 3D model**.
 3. Check the 3D preview, then download the **3MF** and open it in Bambu Studio. Your files are also saved in the `output` folder.
    Have an AMS and want color? Download the **Color OBJ** instead. Bambu Studio can turn its colors into filament slots when you import it.
+
+## Tripo mode (cloud, most detail)
+
+1. Make an account at <https://platform.tripo3d.ai> (Tripo's developer platform. It's separate from studio.tripo3d.ai, and credits aren't shared between them.)
+2. Buy credits there and check their pricing page for what one model costs.
+3. Under **API Keys**, create a key. It starts with `tsk_`.
+4. Start **`start-public.bat`**. The first time, it asks for the Tripo key and saves it in `tripo-key.txt`, which never gets uploaded. Or create that file yourself with just the key in it.
+5. In the app, pick **Tripo**. It takes a few minutes. The app shows the credits used and left after each model.
+
+Never paste the key into a chat or email. If it leaks, delete it on the Tripo site and make a new one.
+
+Tripo mode gives you the usual 3MF/STL/Color OBJ, plus **Tripo original**: Tripo's own model file with its full-resolution color texture.
+
+To change the key, delete `tripo-key.txt` and start again.
 
 ## Use it from your phone, anywhere
 
@@ -108,6 +123,7 @@ Good to know:
 - `cli.py`: command-line version
 - `pipeline.py`: photo → 3D with Hunyuan3D-2 (Best) or TripoSR (Fast). Keeps only the model in use on the GPU.
 - `colorize.py`: paints the photo onto the model; parts the photo doesn't show get the object's main color
+- `tripo_engine.py`: Tripo cloud mode (uses Tripo's official `tripo3d` Python SDK)
 - `printprep.py`: makes the mesh printable and exports STL/3MF
 - `install.py`, `setup.bat`/`setup.sh`, `start.bat`/`start.sh`: setup and launch scripts
 - `start-public.bat`: launch for phone use (password-protected public link)
@@ -116,5 +132,6 @@ Good to know:
 
 ## Licenses
 
+- Tripo mode: Tripo's API terms apply to models made with it.
 - TripoSR: MIT.
 - Hunyuan3D-2: Tencent Hunyuan 3D 2.0 Community License. Free to use, but **not licensed in the EU, UK or South Korea**. Very large companies (over 1 million monthly users) need a separate license from Tencent.

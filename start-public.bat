@@ -22,6 +22,14 @@ set /p TK=GitHub token:
 :have_token
 set /p PHOTO3D_GITHUB_TOKEN=<github-token.txt
 
+if exist tripo-key.txt goto have_tripo
+echo.
+echo For Tripo-quality models, paste your Tripo API key (starts with tsk_, see README).
+echo Or just press Enter to skip.
+set /p TK2=Tripo API key: 
+>tripo-key.txt echo(%TK2%
+:have_tripo
+
 echo.
 echo Starting... Your phone address:
 echo     https://ringoshitoitsu1.github.io/3DPrinterGenerator/

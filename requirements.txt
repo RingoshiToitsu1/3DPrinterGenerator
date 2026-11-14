@@ -22,3 +22,5 @@ accelerate>=0.30
 opencv-python-headless>=4.8
 pymeshlab>=2023.12
 pyyaml>=6.0
+# Tripo cloud engine (optional, needs an API key)
+tripo3d>=1.0,<2

@@ -16,11 +16,16 @@ OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 studio: Studio | None = None
 
 QUALITY = {
-    "Best (Hunyuan3D-2, about 1-3 min)": "best",
+    "Tripo (cloud, most detail + full color, uses Tripo credits)": "tripo",
+    "Best (Hunyuan3D-2 on your GPU, about 1-3 min, free)": "best",
     "Fast (TripoSR, seconds, rough)": "fast",
 }
 # Per-quality defaults: the sharp model needs little smoothing and more triangles to keep detail.
-DEFAULTS = {"best": dict(smoothing=1, max_tris=500_000), "fast": dict(smoothing=5, max_tris=200_000)}
+DEFAULTS = {
+    "tripo": dict(smoothing=0, max_tris=1_000_000),
+    "best": dict(smoothing=1, max_tris=500_000),
+    "fast": dict(smoothing=5, max_tris=200_000),
+}
 
 
 def make_model(
@@ -42,13 +47,31 @@ def make_model(
         raise gr.Error("Add a photo first.")
     quality = QUALITY.get(quality_label, "best")
     t = time.time()
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", (name or "").strip()) or time.strftime("model_%Y%m%d_%H%M%S")
+    tripo_glb, tripo_info = None, None
     try:
-        progress(0.05, desc="Removing background")
-        rgba = studio.cutout(Image.fromarray(photo), remove_bg, foreground_ratio)
+        if quality == "tripo":
+            import tripo_engine
 
-        slow = "1-3 min" if quality == "best" else "a few seconds"
-        progress(0.2, desc=f"Building 3D shape ({slow})")
-        raw = studio.generate(rgba, quality=quality, detail=detail)
+            seen = Image.fromarray(photo)
+            progress(0.05, desc="Sending photo to Tripo")
+
+            def on_progress(pct):
+                progress(0.05 + 0.75 * pct / 100, desc=f"Tripo is building it ({pct}%)")
+
+            try:
+                raw, tripo_glb, tripo_info = tripo_engine.generate(seen, OUTPUT_DIR, stem, on_progress)
+            except tripo_engine.TripoError as e:
+                raise RuntimeError(str(e))
+            seen = seen.convert("RGB")
+        else:
+            progress(0.05, desc="Removing background")
+            rgba = studio.cutout(Image.fromarray(photo), remove_bg, foreground_ratio)
+            seen = on_gray(rgba)
+
+            slow = "1-3 min" if quality == "best" else "a few seconds"
+            progress(0.2, desc=f"Building 3D shape ({slow})")
+            raw = studio.generate(rgba, quality=quality, detail=detail)
 
         progress(0.85, desc="Making it printable")
         settings = PrintSettings(
@@ -63,14 +86,36 @@ def make_model(
     except RuntimeError as e:
         raise gr.Error(str(e))
 
-    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", (name or "").strip()) or time.strftime("model_%Y%m%d_%H%M%S")
     files = export_all(mesh, OUTPUT_DIR, stem, preview)
-    info = (
-        report.as_markdown()
-        + f"  \n**Time:** {time.time() - t:.0f}s ({quality}, {detail}) on {studio.device}"
-        + f"  \n**Saved to:** `{OUTPUT_DIR}`"
+    where = "on Tripo's servers" if quality == "tripo" else f"({detail}) on {studio.device}"
+    info = report.as_markdown() + f"  \n**Time:** {time.time() - t:.0f}s, {quality} {where}"
+    if tripo_info:
+        used, left = tripo_info.get("credits"), tripo_info.get("balance")
+        if used is not None:
+            info += f"  \n**Tripo credits used:** {used:g}"
+        if left is not None:
+            info += f"  \n**Tripo credits left:** {left:g}"
+    info += f"  \n**Saved to:** `{OUTPUT_DIR}`"
+    return (
+        seen,
+        str(files["glb"]),
+        str(files["3mf"]),
+        str(files["stl"]),
+        str(files["obj"]),
+        str(tripo_glb) if tripo_glb else None,
+        info,
     )
-    return on_gray(rgba), str(files["glb"]), str(files["3mf"]), str(files["stl"]), str(files["obj"]), info
+
+
+def _default_quality() -> str:
+    """Tripo when a key is set up, otherwise the local Best model."""
+    import tripo_engine
+
+    want = "tripo" if tripo_engine.api_key() else "best"
+    return next(label for label, q in QUALITY.items() if q == want)
+
+
+DEFAULT_QUALITY = _default_quality()
 
 
 def quality_changed(quality_label):
@@ -88,9 +133,11 @@ def build_ui() -> gr.Blocks:
         with gr.Row():
             with gr.Column():
                 photo = gr.Image(label="Photo", type="numpy", image_mode="RGBA", sources=["upload", "clipboard", "webcam"])
-                quality = gr.Radio(list(QUALITY), value=list(QUALITY)[0], label="Quality")
+                quality = gr.Radio(list(QUALITY), value=DEFAULT_QUALITY, label="Quality")
                 detail = gr.Radio(
-                    ["Normal", "High", "Max"], value="High", label="Detail (Max = sharpest, slowest, most memory)"
+                    ["Normal", "High", "Max"],
+                    value="High",
+                    label="Detail for Best/Fast (Max = sharpest, slowest; Tripo is always max)",
                 )
                 height = gr.Slider(10, 250, value=80, step=1, label="Print height (mm)")
                 name = gr.Textbox(label="File name (optional)", placeholder="e.g. bitcoin_miner")
@@ -98,11 +145,13 @@ def build_ui() -> gr.Blocks:
                     turn = gr.Dropdown(list(TURNS), value="None", label="Model lying down? Turn it")
                     remove_bg = gr.Checkbox(value=True, label="Remove background")
                     fg_ratio = gr.Slider(0.5, 1.0, value=0.85, step=0.05, label="Object size in frame")
-                    smoothing = gr.Slider(0, 20, value=DEFAULTS["best"]["smoothing"], step=1, label="Smoothing (lower keeps more detail)")
+                    smoothing = gr.Slider(
+                        0, 20, value=DEFAULTS[QUALITY[DEFAULT_QUALITY]]["smoothing"], step=1, label="Smoothing (lower keeps more detail)"
+                    )
                     flat_base = gr.Checkbox(value=True, label="Flat base (cut the bottom so it sits on the plate)")
                     base_cut = gr.Slider(0, 20, value=3, step=0.5, label="Base cut (% of height)")
                     max_tris = gr.Slider(
-                        0, 2_000_000, value=DEFAULTS["best"]["max_tris"], step=50_000, label="Max triangles (0 = no limit)"
+                        0, 2_000_000, value=DEFAULTS[QUALITY[DEFAULT_QUALITY]]["max_tris"], step=50_000, label="Max triangles (0 = no limit)"
                     )
                 go = gr.Button("Make 3D model", variant="primary")
             with gr.Column():
@@ -113,12 +162,13 @@ def build_ui() -> gr.Blocks:
                     file_3mf = gr.File(label="3MF (open in Bambu Studio)")
                     file_stl = gr.File(label="STL")
                 file_obj = gr.File(label="Color OBJ (for multi-color printing with an AMS)")
+                file_tripo = gr.File(label="Tripo original (GLB with full texture, Tripo mode only)")
 
         quality.change(quality_changed, inputs=quality, outputs=[smoothing, max_tris])
         go.click(
             make_model,
             inputs=[photo, quality, detail, remove_bg, fg_ratio, height, flat_base, base_cut, smoothing, max_tris, turn, name],
-            outputs=[processed, viewer, file_3mf, file_stl, file_obj, info],
+            outputs=[processed, viewer, file_3mf, file_stl, file_obj, file_tripo, info],
         )
     return demo
 
@@ -141,7 +191,10 @@ if __name__ == "__main__":
         help="get a temporary public https://xxxx.gradio.live address (requires --password)",
     )
     ap.add_argument(
-        "--preload", choices=["best", "fast", "none"], default="best", help="load this model at startup"
+        "--preload",
+        choices=["best", "fast", "none"],
+        default=None,
+        help="load this local model at startup (default: best, or none when a Tripo key is set up)",
     )
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
@@ -159,6 +212,12 @@ if __name__ == "__main__":
     print(f"Using {studio.device}.")
     if studio.device == "cpu":
         print("No NVIDIA GPU found: running on CPU. Fast works; Best is very slow on CPU (10-30 min).")
+    if args.preload is None:
+        import tripo_engine
+
+        args.preload = "none" if tripo_engine.api_key() else "best"
+        if args.preload == "none":
+            print("Tripo key found: Tripo is the default. Local models load when you first pick them.")
     if args.preload != "none":
         name = "Hunyuan3D-2 (first run downloads several GB)" if args.preload == "best" else "TripoSR"
         print(f"Loading {name}...")
