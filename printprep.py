@@ -159,11 +159,13 @@ def export_all(mesh: trimesh.Trimesh, out_dir: Path, name: str, color_preview: t
         "stl": out_dir / f"{name}.stl",
         "3mf": out_dir / f"{name}.3mf",
         "glb": out_dir / f"{name}_preview.glb",
+        "obj": out_dir / f"{name}_color.obj",
     }
     preview = (color_preview if color_preview is not None else mesh).copy()
     shape = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=False)  # print files: shape only
     shape.export(paths["stl"])
     shape.export(paths["3mf"])
+    preview.export(paths["obj"])  # same shape and size, with the photo's colors (for multi-color printing)
 
     # GLB viewers are Y-up; rotate so the preview stands upright.
     # so the side facing the camera in the photo faces the viewer.

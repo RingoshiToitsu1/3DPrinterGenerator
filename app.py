@@ -70,7 +70,7 @@ def make_model(
         + f"  \n**Time:** {time.time() - t:.0f}s ({quality}, {detail}) on {studio.device}"
         + f"  \n**Saved to:** `{OUTPUT_DIR}`"
     )
-    return on_gray(rgba), str(files["glb"]), str(files["3mf"]), str(files["stl"]), info
+    return on_gray(rgba), str(files["glb"]), str(files["3mf"]), str(files["stl"]), str(files["obj"]), info
 
 
 def quality_changed(quality_label):
@@ -112,12 +112,13 @@ def build_ui() -> gr.Blocks:
                 with gr.Row():
                     file_3mf = gr.File(label="3MF (open in Bambu Studio)")
                     file_stl = gr.File(label="STL")
+                file_obj = gr.File(label="Color OBJ (for multi-color printing with an AMS)")
 
         quality.change(quality_changed, inputs=quality, outputs=[smoothing, max_tris])
         go.click(
             make_model,
             inputs=[photo, quality, detail, remove_bg, fg_ratio, height, flat_base, base_cut, smoothing, max_tris, turn, name],
-            outputs=[processed, viewer, file_3mf, file_stl, info],
+            outputs=[processed, viewer, file_3mf, file_stl, file_obj, info],
         )
     return demo
 

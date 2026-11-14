@@ -38,6 +38,7 @@ Mac/Linux: run `./setup.sh` instead.
    The first start downloads the AI models (several GB). After that it's quick.
 2. Drop in a photo, set the **print height in mm**, then click **Make 3D model**.
 3. Check the 3D preview, then download the **3MF** and open it in Bambu Studio. Your files are also saved in the `output` folder.
+   Have an AMS and want color? Download the **Color OBJ** instead. Bambu Studio can turn its colors into filament slots when you import it.
 
 ## Use it from your phone, anywhere
 
@@ -106,6 +107,7 @@ Good to know:
 - `app.py`: the browser app
 - `cli.py`: command-line version
 - `pipeline.py`: photo → 3D with Hunyuan3D-2 (Best) or TripoSR (Fast). Keeps only the model in use on the GPU.
+- `colorize.py`: paints the photo onto the model; parts the photo doesn't show get the object's main color
 - `printprep.py`: makes the mesh printable and exports STL/3MF
 - `install.py`, `setup.bat`/`setup.sh`, `start.bat`/`start.sh`: setup and launch scripts
 - `start-public.bat`: launch for phone use (password-protected public link)

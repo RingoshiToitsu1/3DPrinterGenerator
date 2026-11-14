@@ -263,7 +263,11 @@ class Studio:
     def generate(self, rgba: Image.Image, quality: str = "best", detail: str = "High") -> trimesh.Trimesh:
         engine = self._engine(quality)
         try:
-            return engine.generate(rgba, detail=detail)
+            mesh = engine.generate(rgba, detail=detail)
+            # Paint the photo onto the shape (Hunyuan's shape model has no color of its own).
+            from colorize import project_photo_colors
+
+            return project_photo_colors(mesh, rgba)
         except torch.cuda.OutOfMemoryError:
             _free_gpu()
             raise RuntimeError(
