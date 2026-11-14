@@ -140,12 +140,28 @@ if __name__ == "__main__":
 
     publisher = None
     token = os.environ.get("PHOTO3D_GITHUB_TOKEN", "").strip()
-    if args.public_link and demo.share_url and token:
+    if args.public_link and not demo.share_url:
+        print(
+            "\n!! Couldn't create the public link. Usually Windows Defender or antivirus blocked\n"
+            "   Gradio's connection helper (frpc). Allow it, then close this window and start again."
+        )
+    elif args.public_link and not token:
+        print(
+            "\n!! No GitHub token, so your GitHub page can't find this link.\n"
+            "   Delete github-token.txt in this folder, start again, and paste the token when asked."
+        )
+    elif args.public_link:
         from linkpublisher import LinkPublisher
 
+        print("Saving this link to GitHub...")
         publisher = LinkPublisher(token)
         if publisher.start(demo.share_url):
             print("Saved this link to GitHub. Your GitHub page will forward to it.")
+        else:
+            print(
+                "   Fix: delete github-token.txt, make a new token with the 'gist' box ticked,\n"
+                "   then start again and paste it."
+            )
     try:
         demo.block_thread()
     finally:
