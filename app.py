@@ -96,15 +96,22 @@ if __name__ == "__main__":
     ap.add_argument("--device", default=None, help="cuda:0 or cpu (default: auto)")
     ap.add_argument("--port", type=int, default=7860)
     ap.add_argument(
-        "--share-on-network", action="store_true", help="let your other devices (Wi-Fi or Tailscale) open it"
+        "--share-on-network", action="store_true", help="let other devices on your Wi-Fi open it"
     )
     ap.add_argument(
         "--password",
         default=os.environ.get("PHOTO3D_PASSWORD"),
         help="require this password (any username) to open the app; or set PHOTO3D_PASSWORD",
     )
+    ap.add_argument(
+        "--public-link",
+        action="store_true",
+        help="get a temporary public https://xxxx.gradio.live address (requires --password)",
+    )
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
+    if args.public_link and not args.password:
+        ap.error("--public-link needs a password, otherwise anyone with the link could use your GPU.")
 
     auth = None
     if args.password:
@@ -126,4 +133,5 @@ if __name__ == "__main__":
         auth=auth,
         auth_message="Photo to 3D Print. Any username, your password.",
         pwa=True,  # lets the phone "Add to Home Screen" like an app
+        share=args.public_link,
     )
