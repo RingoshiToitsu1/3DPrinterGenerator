@@ -16,3 +16,9 @@ networkx>=3.0
 gradio>=5.0,<7
 pillow>=10.0
 numpy>=1.26
+# Hunyuan3D-2 (Best quality). diffusers <0.36 keeps it compatible with transformers 4.x.
+diffusers>=0.32,<0.36
+accelerate>=0.30
+opencv-python-headless>=4.8
+pymeshlab>=2023.12
+pyyaml>=6.0

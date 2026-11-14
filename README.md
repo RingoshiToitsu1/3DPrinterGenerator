@@ -2,14 +2,26 @@
 
 Upload a photo, get a 3MF/STL file ready for Bambu Studio. It runs on your own computer, free, with no per-model fees.
 
-It uses **TripoSR**, the open-source model Tripo AI released (MIT license). The app then cleans the model up for printing: it keeps one solid piece, smooths it, gives it a flat base, scales it to the height you pick in mm and sets it on the build plate.
+It has two AI models:
+
+- **Best: Hunyuan3D-2** (Tencent). Sharp, detailed shapes. About 1–3 minutes per model on an NVIDIA card.
+- **Fast: TripoSR** (Tripo AI). Seconds per model, but rough and blobby. Good for quick tests.
+
+The app then cleans the model up for printing: it keeps one solid piece, gives it a flat base, scales it to the height you pick in mm and sets it on the build plate.
+
+## Updating from an older version
+
+1. Download the new ZIP (green **Code** button → **Download ZIP**).
+2. Copy everything from it into your app folder and click **Replace** when Windows asks. Your password, token and installed packages are kept.
+3. Double-click **`setup.bat`** again. It adds what the Best model needs (a few minutes).
+4. The first start after updating downloads the Best model (several GB), so give it some time.
 
 ## What you need
 
 - A Windows PC (Mac/Linux work too).
-- **Best:** an NVIDIA graphics card with 6 GB+ of memory (RTX 2060 or newer). A model takes a few seconds.
-- **No NVIDIA card?** It still works on the CPU, about 30–60 seconds per photo.
-- About 6 GB of free disk space.
+- An NVIDIA graphics card with **8 GB+** of memory for Best quality (e.g. RTX 4070 Laptop, RTX 3060 or better).
+- **No NVIDIA card?** Fast works on the CPU (30–60 seconds per photo). Best on the CPU takes 10–30 minutes.
+- About 20 GB of free disk space (the AI models are big).
 
 ## Setup (one time, Windows)
 
@@ -23,7 +35,7 @@ Mac/Linux: run `./setup.sh` instead.
 ## Use it
 
 1. Double-click **`start.bat`** (Mac/Linux: `./start.sh`). Your browser opens to the app.
-   The first start downloads the AI model (~1.7 GB). After that it's quick.
+   The first start downloads the AI models (several GB). After that it's quick.
 2. Drop in a photo, set the **print height in mm**, then click **Make 3D model**.
 3. Check the 3D preview, then download the **3MF** and open it in Bambu Studio. Your files are also saved in the `output` folder.
 
@@ -75,14 +87,17 @@ Good to know:
 | Print height | Final height in mm, after the base cut. |
 | Remove background | Turn off only if your photo already has a clean or transparent background. |
 | Object size in frame | How much of the frame the object fills before the AI sees it. 0.85 is a good default. |
-| Detail | Mesh resolution. 256 is good. 320–384 is sharper but slower and needs more memory. |
-| Smoothing | Removes the small "stair-step" texture. Raise it for a smoother look, lower it for sharp details. |
+| Quality | **Best** (Hunyuan3D-2): detailed, 1–3 min. **Fast** (TripoSR): rough, seconds. |
+| Detail | **High** is the sweet spot. **Max** is sharper but slower and uses more memory. If you get "out of memory", use High or Normal. |
+| Model lying down? Turn it | If a model comes out on its side or upside down, pick a turn and make it again. |
+| Smoothing | Removes the small "stair-step" texture. Best mode defaults to 1 so detail survives. Raise it for a smoother look. |
 | Flat base / Base cut | Slices a little off the bottom so it sits flat on the plate. |
-| Max triangles | Keeps files a sensible size. 200k is plenty for FDM printing. |
+| Max triangles | Keeps files a sensible size. Best mode defaults to 500k so fine detail is kept. |
 
 ## Troubleshooting
 
-- **"CUDA out of memory"**: lower Detail to 192 or 128, or run `start.bat --device cpu`.
+- **"Ran out of graphics card memory"**: set Detail to High or Normal, and close games or other apps that use the GPU.
+- **Best mode errors or won't load**: run `setup.bat` again. Fast mode keeps working in the meantime.
 - **It says "CPU" but you have an NVIDIA card**: update your NVIDIA driver, delete the `.venv` folder and run `setup.bat` again.
 - **Bad cut-out** (part of the background became part of the model): crop the photo tighter, or remove the background yourself first (phone photo apps can do this) and untick "Remove background".
 
@@ -90,9 +105,14 @@ Good to know:
 
 - `app.py`: the browser app
 - `cli.py`: command-line version
-- `pipeline.py`: photo → 3D, using TripoSR. Runs marching cubes itself, so the hard-to-install `torchmcubes` isn't needed.
+- `pipeline.py`: photo → 3D with Hunyuan3D-2 (Best) or TripoSR (Fast). Keeps only the model in use on the GPU.
 - `printprep.py`: makes the mesh printable and exports STL/3MF
 - `install.py`, `setup.bat`/`setup.sh`, `start.bat`/`start.sh`: setup and launch scripts
 - `start-public.bat`: launch for phone use (password-protected public link)
 - `linkpublisher.py`: saves the current link to a GitHub gist for the front door
 - `docs/`: the GitHub Pages front door
+
+## Licenses
+
+- TripoSR: MIT.
+- Hunyuan3D-2: Tencent Hunyuan 3D 2.0 Community License. Free to use, but **not licensed in the EU, UK or South Korea**. Very large companies (over 1 million monthly users) need a separate license from Tencent.

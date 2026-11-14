@@ -19,6 +19,7 @@ class PrintSettings:
     smoothing: int = 5  # Taubin smoothing passes (removes voxel "stair steps")
     remove_floaters: bool = True  # keep only the biggest piece
     max_triangles: int = 200_000  # 0 = don't simplify
+    turn: str = "None"  # fix a model that came out lying down: see TURNS
 
 
 @dataclass
@@ -39,6 +40,17 @@ class PrintReport:
         )
 
 
+# Rotations (angle, axis) for models that come out lying down. Z is up, front faces +X.
+TURNS = {
+    "None": None,
+    "Tip forward 90°": (np.pi / 2, [0, 1, 0]),
+    "Tip backward 90°": (-np.pi / 2, [0, 1, 0]),
+    "Tip left 90°": (np.pi / 2, [1, 0, 0]),
+    "Tip right 90°": (-np.pi / 2, [1, 0, 0]),
+    "Upside down": (np.pi, [1, 0, 0]),
+}
+
+
 def _clean(mesh: trimesh.Trimesh, remove_floaters: bool) -> trimesh.Trimesh:
     mesh = mesh.copy()
     mesh.merge_vertices()
@@ -48,7 +60,12 @@ def _clean(mesh: trimesh.Trimesh, remove_floaters: bool) -> trimesh.Trimesh:
     if remove_floaters:
         parts = mesh.split(only_watertight=False)
         if len(parts) > 1:
-            mesh = max(parts, key=lambda p: abs(p.volume) if p.is_watertight else p.area)
+            # Drop small specks; keep any piece at least 10% the size of the biggest.
+            biggest = max(len(p.faces) for p in parts)
+            keep = [p for p in parts if len(p.faces) >= 0.1 * biggest]
+            mesh = keep[0] if len(keep) == 1 else trimesh.util.concatenate(keep)
+    if not mesh.is_watertight:
+        trimesh.repair.fill_holes(mesh)
     trimesh.repair.fix_normals(mesh)
     return mesh
 
@@ -96,6 +113,9 @@ def prepare_for_print(
 ) -> tuple[trimesh.Trimesh, trimesh.Trimesh, PrintReport]:
     """Returns (printable mesh, colored preview of it, report)."""
     mesh = _clean(mesh, s.remove_floaters)
+    turn = TURNS.get(s.turn)
+    if turn:
+        mesh.apply_transform(trimesh.transformations.rotation_matrix(*turn))
     if s.smoothing > 0:
         trimesh.smoothing.filter_taubin(mesh, iterations=int(s.smoothing))
     color_ref = mesh.copy()  # keeps the photo's colors, for the on-screen preview

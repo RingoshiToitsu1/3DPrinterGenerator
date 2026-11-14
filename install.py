@@ -2,8 +2,9 @@
 
 1. Installs PyTorch: the NVIDIA (CUDA) build if an NVIDIA card is found, otherwise CPU.
 2. Installs the other Python packages.
-3. Downloads TripoSR's code (pinned version) into vendor/TripoSR.
-The model weights (~1.7 GB) download automatically the first time you run the app.
+3. Downloads TripoSR's and Hunyuan3D-2's code (pinned versions) into vendor/.
+Model weights download automatically the first time you run the app.
+Safe to run again: it updates packages and fetches anything new.
 """
 
 import io
@@ -16,8 +17,11 @@ import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TRIPOSR_COMMIT = "107cefdc244c39106fa830359024f6a2f1c78871"
-TRIPOSR_ZIP = f"https://github.com/VAST-AI-Research/TripoSR/archive/{TRIPOSR_COMMIT}.zip"
+# (repo, pinned commit, folder under vendor/)
+VENDORED = [
+    ("VAST-AI-Research/TripoSR", "107cefdc244c39106fa830359024f6a2f1c78871", "TripoSR"),
+    ("Tencent-Hunyuan/Hunyuan3D-2", "f8db63096c8282cb27354314d896feba5ba6ff8a", "Hunyuan3D-2"),
+]
 # Newest first; the first one that has a wheel for this Python wins.
 CUDA_INDEXES = ["cu130", "cu128", "cu126"]
 
@@ -37,40 +41,44 @@ def install_torch():
     if system in ("Windows", "Linux") and has_nvidia_gpu():
         print("\n== NVIDIA GPU found: installing PyTorch with CUDA ==")
         for tag in CUDA_INDEXES:
-            if pip("torch", "--index-url", f"https://download.pytorch.org/whl/{tag}"):
+            if pip("torch", "torchvision", "--index-url", f"https://download.pytorch.org/whl/{tag}"):
                 return
             print(f"   ({tag} build not available, trying the next one)")
         print("!! Couldn't install a CUDA build; falling back to CPU.")
     else:
         print("\n== No NVIDIA GPU found: installing CPU PyTorch (works, just slower) ==")
     if system == "Linux":
-        ok = pip("torch", "--index-url", "https://download.pytorch.org/whl/cpu")
+        ok = pip("torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cpu")
     else:  # Windows and macOS: the default PyPI build is the CPU / Apple build
-        ok = pip("torch")
+        ok = pip("torch", "torchvision")
     if not ok:
         sys.exit("PyTorch install failed. See the messages above.")
 
 
-def install_triposr():
-    target = HERE / "vendor" / "TripoSR"
-    if (target / "tsr").is_dir():
-        print("\n== TripoSR code already present ==")
+def install_vendored(repo: str, commit: str, folder: str):
+    target = HERE / "vendor" / folder
+    if (target / ".pinned").is_file() and (target / ".pinned").read_text().strip() == commit:
+        print(f"\n== {folder} code already present ==")
         return
-    print("\n== Downloading TripoSR code ==")
+    shutil.rmtree(target, ignore_errors=True)
+    print(f"\n== Downloading {folder} code ==")
+    target.parent.mkdir(exist_ok=True)
     if shutil.which("git"):
-        repo = "https://github.com/VAST-AI-Research/TripoSR.git"
-        if subprocess.call(["git", "clone", "-q", repo, str(target)]) == 0 and subprocess.call(
-            ["git", "-C", str(target), "checkout", "-q", TRIPOSR_COMMIT]
+        url = f"https://github.com/{repo}.git"
+        if subprocess.call(["git", "clone", "-q", url, str(target)]) == 0 and subprocess.call(
+            ["git", "-C", str(target), "checkout", "-q", commit]
         ) == 0:
+            (target / ".pinned").write_text(commit)
             return
         shutil.rmtree(target, ignore_errors=True)
         print("   (git download failed, trying zip)")
-    with urllib.request.urlopen(TRIPOSR_ZIP) as r:
+    with urllib.request.urlopen(f"https://github.com/{repo}/archive/{commit}.zip") as r:
         data = r.read()
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         root = z.namelist()[0].split("/")[0]
         z.extractall(HERE / "vendor")
     (HERE / "vendor" / root).rename(target)
+    (target / ".pinned").write_text(commit)
 
 
 def main():
@@ -81,7 +89,8 @@ def main():
     print("\n== Installing the other packages ==")
     if not pip("-r", str(HERE / "requirements.txt")):
         sys.exit("Package install failed. See the messages above.")
-    install_triposr()
+    for repo, commit, folder in VENDORED:
+        install_vendored(repo, commit, folder)
 
     import torch
 
