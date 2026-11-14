@@ -125,7 +125,8 @@ if __name__ == "__main__":
     print(f"Ready on {engine.device}.")
     if engine.device == "cpu":
         print("No NVIDIA GPU found: running on CPU. It works, just slower.")
-    build_ui().queue(default_concurrency_limit=1).launch(
+    demo = build_ui().queue(default_concurrency_limit=1)
+    demo.launch(
         server_name="0.0.0.0" if args.share_on_network else "127.0.0.1",
         server_port=args.port,
         inbrowser=not args.no_browser,
@@ -134,4 +135,19 @@ if __name__ == "__main__":
         auth_message="Photo to 3D Print. Any username, your password.",
         pwa=True,  # lets the phone "Add to Home Screen" like an app
         share=args.public_link,
+        prevent_thread_lock=True,
     )
+
+    publisher = None
+    token = os.environ.get("PHOTO3D_GITHUB_TOKEN", "").strip()
+    if args.public_link and demo.share_url and token:
+        from linkpublisher import LinkPublisher
+
+        publisher = LinkPublisher(token)
+        if publisher.start(demo.share_url):
+            print("Saved this link to GitHub. Your GitHub page will forward to it.")
+    try:
+        demo.block_thread()
+    finally:
+        if publisher:
+            publisher.stop()

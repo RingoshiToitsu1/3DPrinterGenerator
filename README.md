@@ -29,16 +29,36 @@ Mac/Linux: run `./setup.sh` instead.
 
 ## Use it from your phone, anywhere
 
-1. On the laptop, double-click **`start-public.bat`**. The first time, it asks you to pick a password. It's saved in `phone-password.txt`, which never gets uploaded to GitHub.
-2. In the window that opens, find the line **`Running on public URL: https://xxxxxxxx.gradio.live`**.
-3. Open that address on your phone, from anywhere (Wi‑Fi or cellular), and log in with any username and your password.
-4. Tap the photo box to take a picture or pick one. Your laptop's graphics card builds the model, and you download the 3MF on your phone.
+Your phone address never changes: **<https://ringoshitoitsu1.github.io/3DPrinterGenerator/>**
+
+That GitHub page is a front door. It finds your laptop's current link and forwards you to it. Your laptop's graphics card still does all the work.
+
+### One-time setup
+
+1. **Turn on the GitHub page:** in this repo on GitHub, go to **Settings → Pages**. Under *Branch*, pick **main** and the **/docs** folder, then click **Save**. It goes live in a minute or two.
+2. **Make a GitHub token** so the laptop can save its link. Go to <https://github.com/settings/tokens/new>:
+   - **Note:** `photo to 3d`
+   - **Expiration:** *No expiration*, or a long one
+   - Tick only **gist**, then click **Generate token** and copy it.
+3. On the laptop, double-click **`start-public.bat`**. The first time, it asks for:
+   - a **password** for the app, saved in `phone-password.txt`
+   - the **GitHub token**, saved in `github-token.txt`
+
+   Both files stay on your laptop and never get uploaded to GitHub.
+
+### Every time
+
+1. On the laptop, double-click **`start-public.bat`** and keep the window open.
+2. On your phone, open the GitHub address above. It shows **Laptop is online** and opens the app. Log in with any username and your password.
+3. To get an app icon: in Safari tap **Share → Add to Home Screen**, or in Chrome tap **⋮ → Add to Home screen**.
+
+If it says **Laptop is offline**, the app isn't running, or it stopped within the last ~12 minutes. Start `start-public.bat` and tap **Check again**.
 
 Good to know:
-- **The address changes every time you start `start-public.bat`**, and each one expires after 72 hours. Text it to yourself, or bookmark it after each start.
-- Keep the window open and the laptop on, plugged in and awake. Go to Settings → System → Power and set **Sleep when plugged in** to **Never**.
-- The first time, Gradio downloads a small connection helper. If Windows Defender or your antivirus blocks it, allow it, then start again.
-- The link is public, which is why the password is required. Don't share it.
+- Keep the laptop on, plugged in and awake. Go to Settings → System → Power and set **Sleep when plugged in** to **Never**.
+- The first time, Gradio downloads a small connection helper. If Windows Defender or your antivirus blocks it, allow it and start again.
+- The laptop's link is saved in a public gist named `photo-to-3d-link.json` in your GitHub account, so the GitHub page can read it without a login. Anyone who finds it still needs your password.
+- To change the password or token, delete `phone-password.txt` or `github-token.txt` and start again.
 
 ## Tips for good results
 
@@ -73,4 +93,6 @@ Good to know:
 - `pipeline.py`: photo → 3D, using TripoSR. Runs marching cubes itself, so the hard-to-install `torchmcubes` isn't needed.
 - `printprep.py`: makes the mesh printable and exports STL/3MF
 - `install.py`, `setup.bat`/`setup.sh`, `start.bat`/`start.sh`: setup and launch scripts
-- `start-public.bat`: launch with a password-protected public link for your phone
+- `start-public.bat`: launch for phone use (password-protected public link)
+- `linkpublisher.py`: saves the current link to a GitHub gist for the front door
+- `docs/`: the GitHub Pages front door
